@@ -8,6 +8,12 @@ The system is designed for marketing agencies and performance advertisers who ma
 
 ## Key Features
 
+### ✅ Data Cleaning & Output Filtering
+- The `/api/combined-report/` endpoint now outputs only relevant campaign data:
+  - Excludes entries where both "ACCOUNT NAME" and "CAMPAIGN NAME" are empty.
+  - Excludes entries where both "TOTAL SPEND" and "REVENUE" are zero.
+  - Removes formula fields (`P/L_FORMULA`, `ROI_FORMULA`) and the `"ROI_VALUE"` field from each output object for a cleaner, more relevant dataset.
+
 ✅ **Google Ads API (MCC Integration)**  
 - Full Manager Account support (multi-client account discovery).
 - Robust, recursive discovery of all client accounts, including those in nested multi-level manager hierarchies.

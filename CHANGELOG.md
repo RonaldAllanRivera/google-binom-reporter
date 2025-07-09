@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Version 1.6.0 - Output Data Cleaning & API Refinement
+
+### ✅ Data Cleaning & API Output Improvements
+- The `/api/combined-report/` backend endpoint now:
+  - Excludes entries with both "ACCOUNT NAME" and "CAMPAIGN NAME" empty.
+  - Excludes entries with both "TOTAL SPEND" and "REVENUE" equal to zero.
+  - Removes `"P/L_FORMULA"`, `"ROI_FORMULA"`, and `"ROI_VALUE"` fields from all output objects.
+- Output is now cleaner and more relevant for downstream processing and reporting.
+
 ## Version 1.5.0 - Application Stability & Final Data Verification
 
 ### ✅ Critical Fixes & Stability Improvements

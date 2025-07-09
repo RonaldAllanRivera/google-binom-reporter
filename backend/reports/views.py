@@ -126,6 +126,24 @@ def generate_report(request):
         traffic_source_ids,
         date_type
     )
+    
+    # Filter, transform, and sort the data
+    if isinstance(binom_data, list):
+        # First filter and transform the data
+        filtered_data = [
+            {
+                'id': item.get('id'),
+                'name': item.get('name'),
+                'leads': item.get('leads', '0'),
+                'revenue': item.get('revenue', '0')
+            }
+            for item in binom_data 
+            if item.get('revenue') != "0" or item.get('leads') != "0"
+        ]
+        # Then sort by name (case-insensitive)
+        filtered_data.sort(key=lambda x: str(x.get('name', '')).lower())
+        return Response(filtered_data)
+    
     return Response(binom_data)
 
 @api_view(['GET'])
@@ -153,6 +171,177 @@ def google_ads_test_view(request):
     all_costs = fetch_all_client_campaign_costs(account.refresh_token, start_date, end_date)
     
     return Response(all_costs)
+
+from django.conf import settings
+import os
+
+@api_view(['GET'])
+def combined_report_view(request):
+    """
+    Combined report: merges Binom and Google Ads data, stores result, pushes to Google Sheets, returns local table and sheet URLs.
+    Accepts: start_date, end_date (YYYY-MM-DD)
+    """
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+    # Constants from .env or settings
+    EMAIL = getattr(settings, 'GOOGLE_ACCOUNT_EMAIL', os.environ.get('GOOGLE_ACCOUNT_EMAIL'))
+    TRAFFIC_SOURCE_IDS = getattr(settings, 'TRAFFIC_SOURCE_IDS', os.environ.get('TRAFFIC_SOURCE_IDS', '1,6'))
+    TIMEZONE = getattr(settings, 'DEFAULT_TIMEZONE', os.environ.get('DEFAULT_TIMEZONE', 'America/Atikokan'))
+    DATE_TYPE = getattr(settings, 'DEFAULT_DATE_TYPE', os.environ.get('DEFAULT_DATE_TYPE', 'custom-time'))
+
+    # 1. Fetch Binom data
+    binom_data = fetch_binom_data(
+        start_date,
+        end_date,
+        TIMEZONE,
+        TRAFFIC_SOURCE_IDS,
+        DATE_TYPE
+    )
+    # 2. Fetch Google Ads data
+    account = GoogleAccount.objects.filter(user_email=EMAIL).first()
+    if not account or not account.refresh_token:
+        return Response({"error": "."}, status=400)
+    google_ads_data = fetch_all_client_campaign_costs(account.refresh_token, start_date, end_date)
+
+    # 3. Merge/align data by campaign ID
+    import re
+    def extract_campaign_id(s):
+        if not s:
+            return None
+        # Look for patterns like 250417_02
+        match = re.search(r'(\d{6}_\d{2})', str(s))
+        return match.group(1) if match else None
+
+    # Prepare Binom dict: {campaign_id: row}
+    binom_rows = binom_data['data'] if isinstance(binom_data, dict) and 'data' in binom_data else binom_data
+    binom_lookup = {}
+    for row in binom_rows or []:
+        cid = extract_campaign_id(row.get('name'))
+        if cid:
+            binom_lookup[cid] = row
+
+    # Prepare Google Ads dict: {campaign_id: row}
+    google_rows = google_ads_data['data'] if isinstance(google_ads_data, dict) and 'data' in google_ads_data else google_ads_data
+    google_lookup = {}
+    for row in google_rows or []:
+        cid = extract_campaign_id(row.get('Campaign'))
+        if cid:
+            google_lookup[cid] = row
+
+    # Merge by campaign ID (Google + Binom)
+    combined_rows = []
+    matched_binom_cids = set()
+    for cid, binom_row in binom_lookup.items():
+        if cid in google_lookup:
+            google_row = google_lookup[cid]
+            account_name = google_row.get('Account', '')
+            campaign_name = binom_row.get('name', '')
+            total_spend = float(google_row.get('Cost', 0))
+            revenue = float(binom_row.get('revenue', 0))
+            sales = binom_row.get('leads', '0')
+            pl_value = revenue - total_spend
+            roi_value = ((revenue / total_spend) - 1) if total_spend else 0
+            row_number = len(combined_rows) + 2
+            pl_formula = f'=D{row_number}-C{row_number}'
+            roi_formula = f'=(D{row_number}/C{row_number})-1'
+            combined_rows.append({
+                'ACCOUNT NAME': account_name,
+                'CAMPAIGN NAME': campaign_name,
+                'TOTAL SPEND': total_spend,
+                'REVENUE': revenue,
+                'P/L': pl_value,
+                'P/L_FORMULA': pl_formula,
+                'ROI': f'{roi_value:.2%}',
+                'ROI_VALUE': roi_value,
+                'ROI_FORMULA': roi_formula,
+                'SALES': sales
+            })
+            matched_binom_cids.add(cid)
+
+    # Add all Binom-only campaigns (not present in Google data)
+    def extract_account_name(campaign_name):
+        if not campaign_name:
+            return ''
+        # Use the part before the first ' - '
+        return str(campaign_name).split(' - ')[0].strip()
+
+    for row in binom_rows or []:
+        cid = extract_campaign_id(row.get('name'))
+        if cid not in matched_binom_cids:
+            campaign_name = row.get('name', '')
+            account_name = extract_account_name(campaign_name)
+            total_spend = 0
+            revenue = float(row.get('revenue', 0))
+            sales = row.get('leads', '0')
+            pl_value = revenue
+            roi_value = ''  # Or 0 if you want
+            roi_display = ''
+            row_number = len(combined_rows) + 2
+            pl_formula = f'=D{row_number}-C{row_number}'
+            roi_formula = f'=(D{row_number}/C{row_number})-1'
+            combined_rows.append({
+                'ACCOUNT NAME': account_name,
+                'CAMPAIGN NAME': campaign_name,
+                'TOTAL SPEND': total_spend,
+                'REVENUE': revenue,
+                'P/L': pl_value,
+                'P/L_FORMULA': pl_formula,
+                'ROI': roi_display,
+                'ROI_VALUE': roi_value,
+                'ROI_FORMULA': roi_formula,
+                'SALES': sales
+            })
+    # Columns for frontend DataGrid
+    columns = [
+        {"field": "ACCOUNT NAME", "headerName": "ACCOUNT NAME", "width": 180},
+        {"field": "CAMPAIGN NAME", "headerName": "CAMPAIGN NAME", "width": 300},
+        {"field": "TOTAL SPEND", "headerName": "TOTAL SPEND", "width": 130},
+        {"field": "REVENUE", "headerName": "REVENUE", "width": 130},
+        {"field": "P/L", "headerName": "P/L", "width": 120},
+        {"field": "ROI", "headerName": "ROI", "width": 120},
+        {"field": "SALES", "headerName": "SALES", "width": 100}
+    ]
+    # Sort by ACCOUNT NAME, then by CAMPAIGN NAME (both case-insensitive)
+    combined_rows.sort(key=lambda x: (str(x.get('ACCOUNT NAME', '')).lower(), str(x.get('CAMPAIGN NAME', '')).lower()))
+    # Add id for DataGrid
+    for i, row in enumerate(combined_rows):
+        row['id'] = i
+
+    # 4. Store in DB (stub)
+    # TODO: Implement DB storage for historical/ROI
+
+    # 5. Push to Google Sheets (stub)
+    sheet_url = None
+    sheet_preview_url = None
+    # TODO: Implement Google Sheets API integration
+
+    # 6. Return data
+    # Clean and filter combined_rows before returning
+    cleaned_rows = []
+    for row in combined_rows:
+        # Exclude if both ACCOUNT NAME and CAMPAIGN NAME are empty
+        if not str(row.get("ACCOUNT NAME", "")).strip() and not str(row.get("CAMPAIGN NAME", "")).strip():
+            continue
+        # Exclude if both TOTAL SPEND and REVENUE are zero
+        try:
+            spend = float(row.get("TOTAL SPEND", 0))
+            revenue = float(row.get("REVENUE", 0))
+        except (TypeError, ValueError):
+            spend = revenue = 0
+        if spend == 0 and revenue == 0:
+            continue
+        # Remove formula fields and ROI_VALUE
+        row.pop("P/L_FORMULA", None)
+        row.pop("ROI_FORMULA", None)
+        row.pop("ROI_VALUE", None)
+        cleaned_rows.append(row)
+
+    return Response({
+        "rows": cleaned_rows,
+        "columns": columns,
+        "sheetUrl": sheet_url,
+        "sheetPreviewUrl": sheet_preview_url
+    })
 
 @api_view(['GET'])
 def google_ads_manager_check(request):

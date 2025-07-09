@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/google-ads/test/', views.google_ads_test_view),
     path('api/report/generate/', views.generate_report),
     path('api/google-ads/manager-check/', views.google_ads_manager_check),
+    path('api/combined-report/', views.combined_report_view),
 ]
