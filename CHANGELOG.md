@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## Version 1.7.0 - July 2025: Backend Refactor & Modularization
+
+### 🆕 Major Refactor: Google Ads Backend Modularization
+- **Refactored all Google Ads authentication and reporting logic into separate modules:**
+  - `backend/reports/auth_utils.py`: Google OAuth URL building and token exchange.
+  - `backend/reports/google_ads_client.py`: Google Ads API client loader.
+  - `backend/reports/google_ads_reports.py`: Campaign cost fetching & account hierarchy traversal.
+- `backend/reports/google_auth_service.py` is now a thin facade, importing and exposing functions from the new modules.
+- **Benefits:**
+  - Improved maintainability and code organization.
+  - Easier to extend and test Google Ads integration logic.
+  - Clear separation of authentication, client setup, and reporting logic.
+
 ## Version 1.6.0 - Output Data Cleaning & API Refinement
 
 ### ✅ Data Cleaning & API Output Improvements

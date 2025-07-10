@@ -8,6 +8,22 @@ The system is designed for marketing agencies and performance advertisers who ma
 
 ## Key Features
 
+### 🆕 July 2025: Backend Refactor
+
+The Google Ads authentication and reporting backend has been refactored for modularity and maintainability:
+
+- **New modules:**
+  - `backend/reports/auth_utils.py`: Handles Google OAuth URL building and token exchange.
+  - `backend/reports/google_ads_client.py`: Handles Google Ads API client loading.
+  - `backend/reports/google_ads_reports.py`: Handles campaign cost fetching and account hierarchy discovery.
+- `backend/reports/google_auth_service.py` now acts as a thin facade, importing and exposing all main functions from the new modules.
+
+**Benefits:**
+- Improved code organization and readability.
+- Easier to maintain, test, and extend Google Ads integration logic.
+- Clear separation of authentication, client setup, and reporting logic.
+
+
 ### ✅ Data Cleaning & Output Filtering
 - The `/api/combined-report/` endpoint now outputs only relevant campaign data:
   - Excludes entries where both "ACCOUNT NAME" and "CAMPAIGN NAME" are empty.
