@@ -99,7 +99,27 @@ The Google Ads authentication and reporting backend has been refactored for modu
 
 ---
 
-## Usage
+## Local Development with Docker
+
+This project is fully containerized for easy and consistent local development. The entire stack (Backend + Frontend) can be launched with a single command.
+
+**Prerequisites:**
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+**To start the development environment:**
+
+```bash
+docker-compose up --build
+```
+
+- The backend will be available at `http://localhost:8000`.
+- The frontend will be available at `http://localhost:3000`.
+
+Hot-reloading is enabled for both services, so any changes you make to the code will be reflected automatically.
+
+---
+
+## Manual Usage
 
 1. Clone the repository.
 2. Setup virtual environment.

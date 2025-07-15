@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Version 1.8.0 - July 2025: Dockerized Local Development
+
+### ✨ New Feature: Dockerized Development Environment
+- **Added `docker-compose.yml`** to orchestrate the entire application stack (backend and frontend).
+- **Created `Dockerfile.dev`** for both Django and Next.js services, optimized for local development with hot-reloading.
+- **Simplified Setup**: Developers can now run the entire application with a single command (`docker-compose up --build`), eliminating the need for manual environment setup.
+- **Consistent Environment**: Ensures all developers work with the same dependencies and environment, reducing "it works on my machine" issues.
+
 ## Version 1.7.0 - July 2025: Backend Refactor & Modularization
 
 ### 🆕 Major Refactor: Google Ads Backend Modularization
