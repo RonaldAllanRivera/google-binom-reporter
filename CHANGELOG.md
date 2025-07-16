@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## Version 1.9.0 - July 2025: Backend API Authentication
+
+### ✨ New Feature: Secure API Endpoints
+- **Implemented Session-Based Authentication**: Secured all sensitive data-reporting endpoints (`/api/report/generate/`, `/api/google-ads/test/`, etc.) to protect them from public access.
+- **Custom Permission Class**: Created a new `IsGoogleOrSuperuser` permission in Django REST Framework. Access is now restricted to users authenticated via Google OAuth or to Django superusers.
+- **Django Session Login**: The Google OAuth callback now logs the user into a Django session, enabling them to access the newly secured endpoints after authenticating.
+
+### 🔧 Configuration & Bug Fixes
+- **Cross-Origin Resource Sharing (CORS)**: Installed and configured `django-cors-headers` to allow the Next.js frontend (`localhost:3000`) to communicate with the Django backend (`localhost:8000`).
+- **Cross-Origin Cookies**: Correctly configured `SESSION_COOKIE_SAMESITE = 'None'` and `CSRF_COOKIE_SAMESITE = 'None'` to allow the browser to send session and CSRF cookies across different origins.
+- **HTTPS Development Server**: Added `django-extensions` and configured the backend to run over HTTPS (`runserver_plus --cert-file cert.pem --key-file key.pem`), a requirement for secure cross-origin cookies.
+- **Frontend Credentials**: Updated the frontend `apiFetch` utility to include `credentials: 'include'` in all requests, ensuring session cookies are sent to the backend.
+
 ## Version 1.8.0 - July 2025: Dockerized Local Development
 
 ### ✨ New Feature: Dockerized Development Environment

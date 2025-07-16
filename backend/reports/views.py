@@ -1,12 +1,16 @@
 # backend/reports/views.py
 from django.db import transaction
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from django.contrib.auth import login
+from django.contrib.auth.models import User
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 import requests
 import logging
 from .google_auth_service import build_auth_url, exchange_code_for_tokens, fetch_all_client_campaign_costs
 from .models import GoogleAccount
 from .report_service import fetch_binom_data
+from .permissions import IsGoogleOrSuperuser
 
 
 logger = logging.getLogger(__name__)
@@ -85,12 +89,30 @@ def google_auth_callback(request):
         logger.error(f"Database error while processing Google account for {user_email}: {e}", exc_info=True)
         return Response({"error": "A database error occurred while processing the Google account.", "details": str(e)}, status=500)
 
+    # Log the user in to create a session
+    try:
+        user, created = User.objects.get_or_create(
+            username=user_email,
+            defaults={'email': user_email}
+        )
+        if created:
+            user.set_unusable_password()
+            user.save()
+        
+        login(request, user)
+        logger.info(f"Successfully logged in and created session for user: {user_email}")
+
+    except Exception as e:
+        logger.error(f"Failed to create session for user {user_email}: {e}", exc_info=True)
+        # Don't block the process if session creation fails, but log it as a critical issue.
+
     return Response({
         "message": message,
         "email": user_email
     })
 
 @api_view(['GET'])
+@permission_classes([IsGoogleOrSuperuser])
 def generate_report(request):
     """
     API endpoint for internal use only.
@@ -147,6 +169,7 @@ def generate_report(request):
     return Response(binom_data)
 
 @api_view(['GET'])
+@permission_classes([IsGoogleOrSuperuser])
 def google_ads_test_view(request):
     """
     Returns Google Ads cost/campaign data for all enabled accounts (or one customer_id if provided).
@@ -176,6 +199,7 @@ from django.conf import settings
 import os
 
 @api_view(['GET'])
+@permission_classes([IsGoogleOrSuperuser])
 def combined_report_view(request):
     """
     Combined report: merges Binom and Google Ads data, stores result, pushes to Google Sheets, returns local table and sheet URLs.
@@ -344,6 +368,7 @@ def combined_report_view(request):
     })
 
 @api_view(['GET'])
+@permission_classes([IsGoogleOrSuperuser])
 def google_ads_manager_check(request):
     """
     Lists all accounts in the hierarchy, including their name, ID, parent, and manager status.

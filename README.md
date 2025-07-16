@@ -14,15 +14,15 @@ The system is designed for marketing agencies and performance advertisers who ma
 
 ### Django Backend API Endpoints
 
-| Endpoint                              | Method | Description |
-|----------------------------------------|--------|-------------|
-| `/admin/`                             | GET    | Django admin panel. Restricted to superusers/admins. |
-| `/api/auth/google/`                    | GET    | Initiate Google OAuth2 authentication. Returns a Google consent screen URL. |
-| `/api/auth/google/callback/`           | GET    | Callback for Google OAuth2. Exchanges code for tokens, stores credentials. Used internally after OAuth. |
-| `/api/google-ads/test/`                | GET    | Fetches Google Ads cost/campaign data for all enabled accounts or a specific customer. Diagnostic endpoint. |
-| `/api/report/generate/`                | GET    | Returns raw Binom campaign report for a given date range and filters. Used for backend/reporting automation. |
-| `/api/google-ads/manager-check/`       | GET    | Lists all Google Ads accounts in the hierarchy for diagnostics. |
-| `/api/combined-report/`                | GET    | Merges Binom and Google Ads data, pushes to Google Sheets, returns table and sheet URLs. |
+| Endpoint                             | Method | Permissions                    | Description                                                                                                      |
+| ------------------------------------ | ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `/admin/`                             | GET    | Superuser                      | Django admin panel for site administration.                                                                      |
+| `/api/auth/google/`                    | GET    | Public                         | Initiates Google OAuth2 authentication. Returns a Google consent screen URL.                                     |
+| `/api/auth/google/callback/`           | GET    | Public                         | Handles the Google OAuth2 callback. Exchanges authorization code for tokens and creates a user session.        |
+| `/api/google-ads/test/`                | GET    | Google User or Superuser       | Fetches Google Ads cost/campaign data for enabled accounts.                                                      |
+| `/api/report/generate/`                | GET    | Google User or Superuser       | Returns a raw Binom campaign report for a given date range and filters.                                          |
+| `/api/google-ads/manager-check/`       | GET    | Google User or Superuser       | Lists all Google Ads accounts in the manager hierarchy for diagnostics.                                          |
+| `/api/combined-report/`                | GET    | Google User or Superuser       | Merges Binom and Google Ads data, pushes it to Google Sheets, and returns the report details.                  |
 
 ### Frontend (Next.js) Pages/Routes
 

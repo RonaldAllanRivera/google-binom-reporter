@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'reports',  # your reports app
+    'django_extensions', # Added for running dev server with SSL
 ]
 
 MIDDLEWARE = [
@@ -118,33 +119,41 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-# ==== Database (auto-switch production vs dev) ====
+# CORS Settings
+CORS_ALLOW_CREDENTIALS = True # Allow cookies to be sent with requests
+
 if ENVIRONMENT == "production":
+    # TODO: Replace with your actual frontend production domain
     CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://192.168.1.28:3000",
-    # add your production frontend URL here]
-]
-    # For production, DATABASE_URL from .env will be used by env.db_url()
-    # Ensure your .env has a DATABASE_URL like:
-    # DATABASE_URL=postgres://user:pass@host:port/dbname
-    DATABASES = {
-        'default': env.db_url(
-            'DATABASE_URL', # Reads the DATABASE_URL from .env
-            conn_max_age=600,
-            ssl_require=True # Common for production databases
-        )
-    }
-else:
-    # For development, uses the default sqlite from Env instantiation or .env if overridden
-    CORS_ALLOW_ALL_ORIGINS = True
-    DATABASES = {
-        'default': env.db_url(
-            'DATABASE_URL', # Reads DATABASE_URL from .env, or uses default from Env()
-            default=f'sqlite:///{BASE_DIR / "db.sqlite3"}' # Explicit fallback if not in .env
-        )
-    }
+        env('SITE_URL'), # Assumes SITE_URL is your frontend URL in production
+        "http://192.168.1.28:3000", # Keep for local network access if needed
+    ]
+else: # Development settings
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+# Database
+# Session Cookie Settings for Cross-Origin Requests
+# These are necessary for the frontend (e.g., localhost:3000) to send session cookies to the backend (e.g., localhost:8000)
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True # Requires HTTPS, even in development
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+DATABASES = {
+    'default': env.db_url(
+        'DATABASE_URL',
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+    )
+}
+# Production-specific DB settings like SSL can be handled within the env.db_url call if needed
+if ENVIRONMENT == "production":
+    DATABASES['default']['CONN_MAX_AGE'] = 600
+    DATABASES['default']['SSL_REQUIRE'] = True
 
 # Email settings
 EMAIL_BACKEND = env('EMAIL_BACKEND')
