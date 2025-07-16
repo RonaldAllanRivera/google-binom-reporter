@@ -8,6 +8,36 @@ The system is designed for marketing agencies and performance advertisers who ma
 
 ## Key Features
 
+---
+
+## 📚 API & Frontend Endpoints Reference
+
+### Django Backend API Endpoints
+
+| Endpoint                              | Method | Description |
+|----------------------------------------|--------|-------------|
+| `/admin/`                             | GET    | Django admin panel. Restricted to superusers/admins. |
+| `/api/auth/google/`                    | GET    | Initiate Google OAuth2 authentication. Returns a Google consent screen URL. |
+| `/api/auth/google/callback/`           | GET    | Callback for Google OAuth2. Exchanges code for tokens, stores credentials. Used internally after OAuth. |
+| `/api/google-ads/test/`                | GET    | Fetches Google Ads cost/campaign data for all enabled accounts or a specific customer. Diagnostic endpoint. |
+| `/api/report/generate/`                | GET    | Returns raw Binom campaign report for a given date range and filters. Used for backend/reporting automation. |
+| `/api/google-ads/manager-check/`       | GET    | Lists all Google Ads accounts in the hierarchy for diagnostics. |
+| `/api/combined-report/`                | GET    | Merges Binom and Google Ads data, pushes to Google Sheets, returns table and sheet URLs. |
+
+### Frontend (Next.js) Pages/Routes
+
+| Route                                 | Description |
+|---------------------------------------|-------------|
+| `/auth/google`                        | Google login page. Initiates Google OAuth2 flow via backend. |
+| `/auth/google-callback`               | Handles Google OAuth2 callback, displays result or error to user. |
+| `/report/binom`                       | UI for fetching and displaying Binom campaign reports. |
+| `/report/combined`                    | UI for generating and viewing combined Binom + Google Ads reports. |
+| `/report/google-ads-test`             | UI for testing/fetching Google Ads cost/campaign data. |
+
+> **Note:** All `/api/...` endpoints are served by Django backend. All `/auth/...` and `/report/...` routes are Next.js frontend pages that interact with the backend APIs.
+
+---
+
 ### 🆕 July 2025: Backend Refactor
 
 The Google Ads authentication and reporting backend has been refactored for modularity and maintainability:
