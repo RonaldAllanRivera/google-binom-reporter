@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## Version 2.0.0 - July 2025: Frontend Refactor & Test Improvements
+
+### 🚀 Frontend Architecture
+- **Project Restructuring**: Moved to a modular `src/` based structure for better code organization
+- **Component Library**: Added Material-UI components and icons for a consistent UI
+- **State Management**: Implemented React Context for theme management
+- **API Integration**: Added Axios for API requests with proper error handling
+
+### 🧪 Testing
+- **Backend Tests**: Added comprehensive test cases for report generation
+- **Mocking**: Implemented proper mocking for external API calls
+- **Test Coverage**: Improved test coverage for critical paths
+
+### 🛠️ Developer Experience
+- **Dependency Updates**: Upgraded to latest versions of key packages
+- **TypeScript**: Enhanced type safety throughout the application
+- **Documentation**: Updated README with new setup instructions
+
 ## Version 1.9.0 - July 2025: Backend API Authentication
 
 ### ✨ New Feature: Secure API Endpoints

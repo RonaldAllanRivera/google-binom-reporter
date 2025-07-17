@@ -1,10 +1,11 @@
 # backend/reports/views.py
 from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 import requests
 import logging
 from .google_auth_service import build_auth_url, exchange_code_for_tokens, fetch_all_client_campaign_costs
@@ -82,9 +83,8 @@ def google_auth_callback(request):
                     GoogleAccount.objects.create(user_email=user_email, refresh_token=new_refresh_token)
                     message = "Google account authorized and created successfully."
                 else:
-                    return Response({
-                        "error": "Authorization succeeded, but no refresh token was provided by Google."
-                    }, status=400)
+                    frontend_callback_url = f'{settings.FRONTEND_URL}/auth/google/callback?email={user_email}'
+                    return redirect(frontend_callback_url)
     except Exception as e:
         logger.error(f"Database error while processing Google account for {user_email}: {e}", exc_info=True)
         return Response({"error": "A database error occurred while processing the Google account.", "details": str(e)}, status=500)
@@ -106,10 +106,9 @@ def google_auth_callback(request):
         logger.error(f"Failed to create session for user {user_email}: {e}", exc_info=True)
         # Don't block the process if session creation fails, but log it as a critical issue.
 
-    return Response({
-        "message": message,
-        "email": user_email
-    })
+    # Redirect back to the frontend callback page with the user's email
+    frontend_callback_url = f'{settings.FRONTEND_URL}/auth/google/callback?email={user_email}'
+    return redirect(frontend_callback_url)
 
 @api_view(['GET'])
 @permission_classes([IsGoogleOrSuperuser])
@@ -196,6 +195,8 @@ def google_ads_test_view(request):
     return Response(all_costs)
 
 from django.conf import settings
+from django.shortcuts import redirect
+from django.shortcuts import redirect
 import os
 
 @api_view(['GET'])
@@ -355,21 +356,14 @@ def combined_report_view(request):
         if spend == 0 and revenue == 0:
             continue
         # Remove formula fields and ROI_VALUE
-        row.pop("P/L_FORMULA", None)
-        row.pop("ROI_FORMULA", None)
-        row.pop("ROI_VALUE", None)
-        cleaned_rows.append(row)
 
-    return Response({
-        "rows": cleaned_rows,
-        "columns": columns,
-        "sheetUrl": sheet_url,
-        "sheetPreviewUrl": sheet_preview_url
-    })
+        if not account.refresh_token:
+            return Response({"error": "No refresh token found for this account. Please re-authenticate."}, status=400)
 
-@api_view(['GET'])
-@permission_classes([IsGoogleOrSuperuser])
-def google_ads_manager_check(request):
+        # The main service function now handles the entire process of fetching and aggregating costs.
+        all_costs = fetch_all_client_campaign_costs(account.refresh_token, start_date, end_date)
+        
+        return Response(all_costs)
     """
     Lists all accounts in the hierarchy, including their name, ID, parent, and manager status.
     This is a diagnostic endpoint to verify account discovery.
@@ -390,3 +384,36 @@ def google_ads_manager_check(request):
     # The function already returns a list of dicts with all the needed info.
     # We can just return it directly.
     return Response(all_accounts)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_status_view(request):
+    return Response({'email': request.user.email})
+
+@api_view(['GET'])
+@permission_classes([IsGoogleOrSuperuser])
+def google_ads_manager_check(request):
+    """
+    Lists all accounts in the hierarchy, including their name, ID, parent, and manager status.
+    This is a diagnostic endpoint to verify account discovery.
+    Usage: /api/google-ads/manager-check/?email=your-email@example.com
+    """
+    email = request.GET.get("email")
+    if not email:
+        return Response({"error": "Email parameter is required."}, status=400)
+    try:
+        account = GoogleAccount.objects.get(user_email=email)
+    except GoogleAccount.DoesNotExist:
+        return Response({"error": f"GoogleAccount not found for email: {email}."}, status=404)
+
+    # Use the enhanced function that gets all accounts and their details.
+    from .google_auth_service import get_all_accounts_in_hierarchy
+    all_accounts = get_all_accounts_in_hierarchy(account.refresh_token)
+    
+    return Response(all_accounts)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    logout(request)
+    return Response(status=status.HTTP_204_NO_CONTENT)

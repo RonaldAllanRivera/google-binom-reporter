@@ -4,6 +4,24 @@ This project is a fully automated multi-platform reporting system that integrate
 
 The system is designed for marketing agencies and performance advertisers who manage multiple client accounts via Google Ads Manager (MCC). It automates the full reporting pipeline — from data extraction, processing, storage, Google Sheets export, and automated email delivery.
 
+## 🚀 Latest Updates (v2.0.0)
+
+### Frontend Improvements
+- Complete project restructuring with a modular `src/` based architecture
+- Modern UI components using Material-UI v7
+- Enhanced theme support with light/dark mode
+- Improved error handling and user feedback
+
+### Backend Enhancements
+- Comprehensive test coverage for report generation
+- Better error handling and logging
+- Optimized API responses
+
+### Developer Experience
+- TypeScript support throughout the application
+- Improved documentation
+- Simplified setup with Docker
+
 ---
 
 ## Key Features
@@ -23,6 +41,8 @@ The system is designed for marketing agencies and performance advertisers who ma
 | `/api/report/generate/`                | GET    | Google User or Superuser       | Returns a raw Binom campaign report for a given date range and filters.                                          |
 | `/api/google-ads/manager-check/`       | GET    | Google User or Superuser       | Lists all Google Ads accounts in the manager hierarchy for diagnostics.                                          |
 | `/api/combined-report/`                | GET    | Google User or Superuser       | Merges Binom and Google Ads data, pushes it to Google Sheets, and returns the report details.                  |
+| `/api/auth/user/`                      | GET    | Authenticated User             | Checks if a user has a valid session and returns their email if authenticated.                                   |
+| `/api/auth/logout/`                    | POST   | Authenticated User             | Logs the user out by clearing their server-side session.                                                         |
 
 ### Frontend (Next.js) Pages/Routes
 
@@ -175,5 +195,3 @@ Or supply any supported Binom timezone string.
 - UI-based multi-account management and reporting logs
 
 ---
-
-> ⚠ **This system is built as a portfolio-grade enterprise backend demonstration for large-scale automated reporting pipelines across multiple advertising and analytics platforms.**

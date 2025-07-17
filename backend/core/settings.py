@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+
+# URL of the frontend application, used for redirects after OAuth
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 import environ
 import dj_database_url # Still useful for parsing DATABASE_URL if not using env.db_url() directly for all cases
 
@@ -18,6 +21,7 @@ env = environ.Env(
     SECRET_KEY=(str, 'your-default-secret-key-for-dev-if-not-in-env'), # IMPORTANT: Override in .env
     DEBUG=(bool, False), # IMPORTANT: Set to True in .env for development
     ALLOWED_HOSTS=(list, ['127.0.0.1', '192.168.1.28', 'localhost']),
+    CSRF_TRUSTED_ORIGINS=(list, []),
     # Database
     DATABASE_URL=(str, f'sqlite:///{BASE_DIR / "db.sqlite3"}'),
     # Email
@@ -34,6 +38,7 @@ env = environ.Env(
     OPENAI_API_KEY=(str, ''),
     GOOGLE_CLIENT_ID=(str, ''),
     GOOGLE_CLIENT_SECRET=(str, ''),
+    GOOGLE_ACCOUNT_EMAIL=(str, ''),
     STRIPE_SECRET_KEY=(str, ''),
     STRIPE_PUBLISHABLE_KEY=(str, ''),
     GOOGLE_DEVELOPER_TOKEN=(str, ''), # Added GOOGLE_DEVELOPER_TOKEN
@@ -135,12 +140,18 @@ else: # Development settings
     ]
 
 # Database
+# Load Google account email from environment
+GOOGLE_ACCOUNT_EMAIL = env('GOOGLE_ACCOUNT_EMAIL')
+
 # Session Cookie Settings for Cross-Origin Requests
 # These are necessary for the frontend (e.g., localhost:3000) to send session cookies to the backend (e.g., localhost:8000)
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True # Requires HTTPS, even in development
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax' if ENVIRONMENT == 'development' else 'None'
+SESSION_COOKIE_SECURE = False if ENVIRONMENT == 'development' else True
+CSRF_COOKIE_SAMESITE = 'Lax' if ENVIRONMENT == 'development' else 'None'
+CSRF_COOKIE_SECURE = False if ENVIRONMENT == 'development' else True
+
+# CSRF Trusted Origins, read from .env
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
