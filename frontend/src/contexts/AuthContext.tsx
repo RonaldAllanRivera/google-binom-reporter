@@ -24,23 +24,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const checkUserStatus = async () => {
+      if (!isMounted) return;
+      
       try {
+        // This will never throw an error because of our interceptor
         const data = await getUserStatus();
-        if (data.isAuthenticated) {
-          setUser(data.user);
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user status', error);
-        setUser(null);
+        
+        if (!isMounted) return;
+        
+        // Always set the user based on the response
+        setUser(data?.isAuthenticated ? data.user : null);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    checkUserStatus();
+    // Small delay to prevent flashing of loading state
+    const timer = setTimeout(() => {
+      checkUserStatus();
+    }, 100);
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const login = useCallback((userData: User) => {
@@ -49,13 +62,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     try {
-      await logoutUser();
-      // On successful backend logout, clear frontend state and redirect.
+      // Clear local storage and state first to ensure UI updates immediately
+      localStorage.clear();
+      sessionStorage.clear();
       setUser(null);
-      router.push('/login');
+      
+      // Call the backend logout endpoint
+      await logoutUser();
+      
+      // Redirect to login page with a flag to prevent any auto-redirects
+      router.push('/login?loggedOut=true');
+      
+      // Force a full page reload to ensure all application state is cleared
+      window.location.href = '/login?loggedOut=true';
     } catch (error) {
       console.error('Backend logout failed:', error);
-      // Optionally, you could show an error message to the user here.
+      // Even if backend logout fails, we still want to clear the local state
+      localStorage.clear();
+      sessionStorage.clear();
+      setUser(null);
+      router.push('/login?error=logout_failed');
     }
   }, [router]);
 

@@ -228,94 +228,155 @@ def combined_report_view(request):
         return Response({"error": "."}, status=400)
     google_ads_data = fetch_all_client_campaign_costs(account.refresh_token, start_date, end_date)
 
-    # 3. Merge/align data by campaign ID
+    # 3. Merge/align data by campaign ID and name
     import re
+    
+    def normalize_campaign_name(name):
+        """Normalize campaign name by removing the domain part and extra spaces"""
+        if not name:
+            return ''
+        # Remove anything in parentheses (domain part)
+        name = re.sub(r'\([^)]*\)', '', str(name))
+        # Remove extra spaces and trim
+        return ' '.join(name.split()).strip()
+    
     def extract_campaign_id(s):
         if not s:
             return None
         # Look for patterns like 250417_02
         match = re.search(r'(\d{6}_\d{2})', str(s))
         return match.group(1) if match else None
+    
+    def get_campaign_key(campaign_name):
+        """Create a consistent key for matching campaigns"""
+        if not campaign_name:
+            return None
+        # Extract the campaign ID if exists
+        cid = extract_campaign_id(campaign_name)
+        if cid:
+            return cid
+        # If no ID, use the normalized campaign name
+        return normalize_campaign_name(campaign_name)
 
-    # Prepare Binom dict: {campaign_id: row}
+    # Prepare Binom dict: {campaign_key: row}
     binom_rows = binom_data['data'] if isinstance(binom_data, dict) and 'data' in binom_data else binom_data
     binom_lookup = {}
     for row in binom_rows or []:
-        cid = extract_campaign_id(row.get('name'))
-        if cid:
-            binom_lookup[cid] = row
+        campaign_name = row.get('name', '')
+        key = get_campaign_key(campaign_name)
+        if key:
+            binom_lookup[key] = row
 
-    # Prepare Google Ads dict: {campaign_id: row}
+    # Prepare Google Ads dict: {campaign_key: row}
     google_rows = google_ads_data['data'] if isinstance(google_ads_data, dict) and 'data' in google_ads_data else google_ads_data
     google_lookup = {}
     for row in google_rows or []:
-        cid = extract_campaign_id(row.get('Campaign'))
-        if cid:
-            google_lookup[cid] = row
+        campaign_name = row.get('Campaign', '')
+        key = get_campaign_key(campaign_name)
+        if key:
+            google_lookup[key] = row
 
-    # Merge by campaign ID (Google + Binom)
+    # Merge by campaign key (ID or normalized name)
     combined_rows = []
-    matched_binom_cids = set()
-    for cid, binom_row in binom_lookup.items():
-        if cid in google_lookup:
-            google_row = google_lookup[cid]
-            account_name = google_row.get('Account', '')
-            campaign_name = binom_row.get('name', '')
-            total_spend = float(google_row.get('Cost', 0))
-            revenue = float(binom_row.get('revenue', 0))
-            sales = binom_row.get('leads', '0')
-            pl_value = revenue - total_spend
-            roi_value = ((revenue / total_spend) - 1) if total_spend else 0
-            row_number = len(combined_rows) + 2
-            pl_formula = f'=D{row_number}-C{row_number}'
-            roi_formula = f'=(D{row_number}/C{row_number})-1'
-            combined_rows.append({
-                'ACCOUNT NAME': account_name,
-                'CAMPAIGN NAME': campaign_name,
-                'TOTAL SPEND': total_spend,
-                'REVENUE': revenue,
-                'P/L': pl_value,
-                'P/L_FORMULA': pl_formula,
-                'ROI': f'{roi_value:.2%}',
-                'ROI_VALUE': roi_value,
-                'ROI_FORMULA': roi_formula,
-                'SALES': sales
-            })
-            matched_binom_cids.add(cid)
-
-    # Add all Binom-only campaigns (not present in Google data)
-    def extract_account_name(campaign_name):
-        if not campaign_name:
-            return ''
-        # Use the part before the first ' - '
-        return str(campaign_name).split(' - ')[0].strip()
-
-    for row in binom_rows or []:
-        cid = extract_campaign_id(row.get('name'))
-        if cid not in matched_binom_cids:
-            campaign_name = row.get('name', '')
-            account_name = extract_account_name(campaign_name)
-            total_spend = 0
-            revenue = float(row.get('revenue', 0))
-            sales = row.get('leads', '0')
-            pl_value = revenue
-            roi_value = ''  # Or 0 if you want
-            roi_display = ''
-            row_number = len(combined_rows) + 2
-            pl_formula = f'=D{row_number}-C{row_number}'
-            roi_formula = f'=(D{row_number}/C{row_number})-1'
-            combined_rows.append({
-                'ACCOUNT NAME': account_name,
-                'CAMPAIGN NAME': campaign_name,
-                'TOTAL SPEND': total_spend,
-                'REVENUE': revenue,
-                'P/L': pl_value,
-                'P/L_FORMULA': pl_formula,
-                'ROI': roi_display,
-                'ROI_VALUE': roi_value,
-                'ROI_FORMULA': roi_formula,
-                'SALES': sales
-            })
+    matched_keys = set()
+    
+    # First, process all campaigns that exist in both Binom and Google Ads
+    common_keys = set(binom_lookup.keys()) & set(google_lookup.keys())
+    for key in common_keys:
+        binom_row = binom_lookup[key]
+        google_row = google_lookup[key]
+        
+        # Get account name from Google or extract from campaign name
+        account_name = google_row.get('Account', '')
+        if not account_name and ' - ' in str(binom_row.get('name', '')):
+            account_name = str(binom_row.get('name', '')).split(' - ')[0].strip()
+            
+        campaign_name = binom_row.get('name', '')
+        # Remove domain part if exists
+        campaign_name = campaign_name.split(' (')[0].strip()
+        
+        total_spend = float(google_row.get('Cost', 0))
+        revenue = float(binom_row.get('revenue', 0))
+        sales = binom_row.get('leads', '0')
+        
+        # Calculate P/L and ROI
+        pl_value = revenue - total_spend
+        roi_value = ((revenue / total_spend) - 1) if total_spend else 0
+        
+        combined_rows.append({
+            'ACCOUNT NAME': account_name,
+            'CAMPAIGN NAME': campaign_name,
+            'TOTAL SPEND': total_spend,
+            'REVENUE': revenue,
+            'P/L': pl_value,
+            'P/L_FORMULA': f'=D{len(combined_rows) + 2}-C{len(combined_rows) + 2}',
+            'ROI': f'{roi_value:.2%}' if total_spend else '',
+            'ROI_VALUE': roi_value if total_spend else 0,
+            'ROI_FORMULA': f'=(D{len(combined_rows) + 2}/C{len(combined_rows) + 2})-1' if total_spend else '',
+            'SALES': sales
+        })
+        matched_keys.add(key)
+    
+    # Add Binom-only campaigns (present in Binom but not in Google Ads)
+    binom_only_keys = set(binom_lookup.keys()) - matched_keys
+    for key in binom_only_keys:
+        binom_row = binom_lookup[key]
+        campaign_name = binom_row.get('name', '')
+        
+        # Extract account name from campaign name if it follows the pattern
+        account_name = ''
+        if ' - ' in str(campaign_name):
+            account_name = str(campaign_name).split(' - ')[0].strip()
+        
+        # Remove domain part if exists
+        campaign_name = campaign_name.split(' (')[0].strip()
+        
+        total_spend = 0
+        revenue = float(binom_row.get('revenue', 0))
+        sales = binom_row.get('leads', '0')
+        
+        combined_rows.append({
+            'ACCOUNT NAME': account_name,
+            'CAMPAIGN NAME': campaign_name,
+            'TOTAL SPEND': total_spend,
+            'REVENUE': revenue,
+            'P/L': revenue,  # P/L is same as revenue when spend is 0
+            'P/L_FORMULA': f'=D{len(combined_rows) + 2}-C{len(combined_rows) + 2}',
+            'ROI': '',  # No ROI when there's no spend
+            'ROI_VALUE': 0,
+            'ROI_FORMULA': '',
+            'SALES': sales
+        })
+    
+    # Add Google Ads-only campaigns (present in Google but not in Binom)
+    google_only_keys = set(google_lookup.keys()) - matched_keys
+    for key in google_only_keys:
+        google_row = google_lookup[key]
+        campaign_name = google_row.get('Campaign', '')
+        
+        # Extract account name from Google data or campaign name
+        account_name = google_row.get('Account', '')
+        if not account_name and ' - ' in str(campaign_name):
+            account_name = str(campaign_name).split(' - ')[0].strip()
+        
+        # Remove domain part if exists
+        campaign_name = campaign_name.split(' (')[0].strip()
+        
+        total_spend = float(google_row.get('Cost', 0))
+        revenue = 0  # No revenue data from Google Ads
+        
+        combined_rows.append({
+            'ACCOUNT NAME': account_name,
+            'CAMPAIGN NAME': campaign_name,
+            'TOTAL SPEND': total_spend,
+            'REVENUE': revenue,
+            'P/L': -total_spend,  # Negative P/L when there's no revenue
+            'P/L_FORMULA': f'=D{len(combined_rows) + 2}-C{len(combined_rows) + 2}',
+            'ROI': '-100.00%',  # -100% ROI when there's no revenue
+            'ROI_VALUE': -1,
+            'ROI_FORMULA': f'=(D{len(combined_rows) + 2}/C{len(combined_rows) + 2})-1',
+            'SALES': '0'  # No sales data from Google Ads
+        })
     # Columns for frontend DataGrid
     columns = [
         {"field": "ACCOUNT NAME", "headerName": "ACCOUNT NAME", "width": 180},
@@ -356,34 +417,33 @@ def combined_report_view(request):
         if spend == 0 and revenue == 0:
             continue
         # Remove formula fields and ROI_VALUE
-
-        if not account.refresh_token:
-            return Response({"error": "No refresh token found for this account. Please re-authenticate."}, status=400)
-
-        # The main service function now handles the entire process of fetching and aggregating costs.
-        all_costs = fetch_all_client_campaign_costs(account.refresh_token, start_date, end_date)
-        
-        return Response(all_costs)
-    """
-    Lists all accounts in the hierarchy, including their name, ID, parent, and manager status.
-    This is a diagnostic endpoint to verify account discovery.
-    Usage: /api/google-ads/manager-check/?email=allan@logicmedia.be
-    """
-    email = request.GET.get("email")
-    if not email:
-        return Response({"error": "Email parameter is required."}, status=400)
-    try:
-        account = GoogleAccount.objects.get(user_email=email)
-    except Exception as e:
-        return Response({"error": f"GoogleAccount not found for email: {email}. {str(e)}"}, status=404)
-
-    # Use the enhanced function that gets all accounts and their details.
-    from .google_auth_service import get_all_accounts_in_hierarchy
-    all_accounts = get_all_accounts_in_hierarchy(account.refresh_token, max_accounts=9999)
+        cleaned_row = {k: v for k, v in row.items() 
+                     if k not in ['P/L_FORMULA', 'ROI_FORMULA', 'ROI_VALUE', 'id']}
+        cleaned_rows.append(cleaned_row)
     
-    # The function already returns a list of dicts with all the needed info.
-    # We can just return it directly.
-    return Response(all_accounts)
+    # 4. Sort the cleaned rows by Account and Campaign name
+    cleaned_rows.sort(key=lambda x: (
+        str(x.get('ACCOUNT NAME', '')).lower(),
+        str(x.get('CAMPAIGN NAME', '')).lower()
+    ))
+    
+    # 5. Format the final output as specified
+    final_output = []
+    for row in cleaned_rows:
+        final_output.append({
+            'Account': row.get('ACCOUNT NAME', ''),
+            'Campaign': row.get('CAMPAIGN NAME', '').split(' (')[0],  # Remove domain part if exists
+            'Total Spend': row.get('TOTAL SPEND', 0),
+            'Revenue': row.get('REVENUE', 0),
+            'Sales': row.get('SALES', 0)
+        })
+    
+    return Response({
+        'data': final_output,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_rows': len(final_output)
+    })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -415,5 +475,25 @@ def google_ads_manager_check(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
+    """
+    Log out the current user by ending their session.
+    This will invalidate the session cookie on the client side.
+    """
     logout(request)
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    response = Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+    
+    # Clear the session cookie
+    response.delete_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        path=settings.SESSION_COOKIE_PATH,
+        domain=settings.SESSION_COOKIE_DOMAIN,
+    )
+    
+    # Clear CSRF token cookie
+    response.delete_cookie(
+        key='csrftoken',
+        path='/',
+        domain=settings.SESSION_COOKIE_DOMAIN,
+    )
+    
+    return response
