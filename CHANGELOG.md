@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## Version 2.2.0 - July 2025: Authentication Security & Global Logout
+
+### 🔒 Authentication & Logout Improvements
+- **Fullstack Auth Security Confirmed:**
+  - Django backend and React/Next.js frontend now provide robust, secure authentication using session cookies and CSRF protection.
+  - All sensitive API and admin endpoints are protected by session authentication and permission classes.
+- **Global Logout:**
+  - Frontend logout button calls the backend logout endpoint, which destroys the session server-side and deletes session cookies for all paths/domains.
+  - Logging out from the frontend logs the user out everywhere, including the Django admin and all browser tabs.
+  - Frontend clears all local state and redirects to login after logout.
+- **Best Practices:**
+  - HttpOnly cookies are never manipulated by JS; all session destruction is handled by the backend.
+  - Cross-origin/CORS and cookie settings are configured for secure development and production environments.
+
+## Version 2.1.0 - July 2025: Combined Report Enhancementsor & Test Improvements
+
+### 🚀 Frontend Architecture
+- **Project Restructuring**: Moved to a modular `src/` based structure for better code organization
+- **Component Library**: Added Material-UI components and icons for a consistent UI
+- **State Management**: Implemented React Context for theme management
+- **API Integration**: Added Axios for API requests with proper error handling
+
+### 🧪 Testing
+- **Backend Tests**: Added comprehensive test cases for report generation
+- **Mocking**: Implemented proper mocking for external API calls
+- **Test Coverage**: Improved test coverage for critical paths
+
+### 🛠️ Developer Experience
+- **Dependency Updates**: Upgraded to latest versions of key packages
+- **TypeScript**: Enhanced type safety throughout the application
+- **Documentation**: Updated README with new setup instructions
+
 ## Version 2.0.0 - July 2025: Frontend Refactor & Test Improvements
 
 ### 🚀 Frontend Architecture

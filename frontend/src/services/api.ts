@@ -61,6 +61,7 @@ api.interceptors.response.use(
   (error) => {
     // Completely swallow 403 errors for the user status endpoint
     if (error.config?.url === '/api/auth/user/' && error.response?.status === 403) {
+      // No logging, no rejection, just resolve with fake unauthenticated response
       return Promise.resolve({
         data: { isAuthenticated: false, user: null },
         status: 200,
@@ -69,9 +70,11 @@ api.interceptors.response.use(
         config: error.config,
       });
     }
-    
     // For all other errors, log them but don't throw
-    if (process.env.NODE_ENV === 'development') {
+    if (
+      process.env.NODE_ENV === 'development' &&
+      !(error.config?.url === '/api/auth/user/' && error.response?.status === 403)
+    ) {
       console.error('API Error:', {
         url: error.config?.url,
         status: error.response?.status,
@@ -79,7 +82,6 @@ api.interceptors.response.use(
         error: error.message,
       });
     }
-    
     return Promise.reject(error);
   }
 );

@@ -19,6 +19,22 @@ The system is designed for marketing agencies and performance advertisers who ma
 
 ### Developer Experience
 - TypeScript support throughout the application
+
+---
+
+## 🔒 Authentication & Logout Security (v2.2.0)
+
+- **Fullstack Auth Security Confirmed:**
+  - Django backend and React/Next.js frontend use robust session-based authentication and CSRF protection.
+  - All sensitive endpoints (API, admin) require authentication.
+- **Global Logout:**
+  - Logging out from the frontend destroys the backend session and deletes session cookies for all paths/domains.
+  - Logging out from any browser tab logs you out everywhere, including Django admin.
+  - Frontend clears all local state and redirects to login after logout.
+- **Best Practices:**
+  - HttpOnly cookies are never manipulated by JS; all session destruction is handled by the backend.
+  - CORS and cookie settings are configured for secure development and production environments.
+
 - Improved documentation
 - Simplified setup with Docker
 
